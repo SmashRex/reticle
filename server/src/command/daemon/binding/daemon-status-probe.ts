@@ -59,11 +59,11 @@ export function fetchStatus(port: number): Promise<unknown> {
  * normally provides this field.
  */
 export function statusPid(payload: unknown): number | null {
-  if (typeof payload !== 'object' || payload === null) return null;
+  if (typeof payload !== 'object' || null === payload) return null;
 
   const pid = (payload as Record<string, unknown>).pid;
 
-  return typeof pid === 'number' && Number.isInteger(pid) && pid > 0 ? pid : null;
+  return 'number' === typeof pid && Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 
 /** One connected tab as `reticle status` reports it — the at-a-glance health line. */

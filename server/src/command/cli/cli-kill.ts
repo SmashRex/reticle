@@ -144,7 +144,8 @@ const KILL_POLL_MS = 100;
  */
 async function terminate(
   pid: number,
-  kill: (pid: number, signal: NodeJS.Signals) => void = process.kill,
+  kill: (pid: number, signal: NodeJS.Signals) => void = (targetPid, signal) =>
+    process.kill(targetPid, signal),
 ): Promise<{ gone: boolean; escalated: boolean }> {
   const signal = (name: NodeJS.Signals): void => {
     try {
