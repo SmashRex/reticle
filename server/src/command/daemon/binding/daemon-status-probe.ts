@@ -52,6 +52,20 @@ export function fetchStatus(port: number): Promise<unknown> {
   });
 }
 
+/**
+ * Extract the daemon pid from the untrusted `/status` response.
+ *
+ * The response comes over HTTP, so the shape cannot be trusted even though Reticle
+ * normally provides this field.
+ */
+export function statusPid(payload: unknown): number | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+
+  const pid = (payload as Record<string, unknown>).pid;
+
+  return typeof pid === 'number' && Number.isInteger(pid) && pid > 0 ? pid : null;
+}
+
 /** One connected tab as `reticle status` reports it — the at-a-glance health line. */
 interface StatusSession {
   sessionId: string;
