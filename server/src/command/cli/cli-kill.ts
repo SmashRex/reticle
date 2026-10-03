@@ -88,7 +88,7 @@ export function planKill(input: {
         action: KillAction.REFUSE,
         forced: false,
         identifiedListener: false,
-        reason:PID_UNKNOWN_REFUSAL_REASON,
+        reason: PID_UNKNOWN_REFUSAL_REASON,
       };
     }
 
