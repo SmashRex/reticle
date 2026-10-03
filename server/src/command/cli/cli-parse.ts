@@ -85,7 +85,7 @@ export const CLI_USAGE = `usage:  npx @reticlehq/server <command>   (or \`reticl
                 path has nowhere to load. This is the path when your client never loaded the
                 reticle_* tools. exit 0 ONLY on verified:"yes" — "unknown" is not a pass)
   reticle affected [--since <ref>] [file...]           (which saved flows must re-verify for the changed files)
-  reticle gate [--since <ref>] [file...]               (exit non-zero unless passing artifacts cover the affected flows)
+  reticle gate [--since <ref>] [--accept-coverage] [file...]  (exit non-zero unless passing artifacts cover the affected flows)
   reticle report [--session <id>] [--hook]             (what the latest session claimed, and what held)
   reticle setup mcp                                    (register the MCP server with your agents; the installer's registration half)
   reticle capsules                                     (list the saved fail-to-pass bug capsules in .reticle/capsules)
@@ -104,6 +104,8 @@ export const CLI_USAGE = `usage:  npx @reticlehq/server <command>   (or \`reticl
                                                        (OPT-IN: tell us who you are, e.g. for support or an enterprise trial)
 
 Cloud (link this project to Reticle; runs/flows recorded on the dashboard):
+  reticle connect [--project <name|id>] [--url <cloud origin>]
+                                                       (wire this app if needed, sign in, link, send local history)
   reticle login [--url <u>] [--email <e>] [--code <c>] [--org <n>]
                                                        (browser device flow by default; --email mails a code)
   reticle logout [--url <u>]                           (sign out of ONE host; others stay signed in)
@@ -131,6 +133,7 @@ const CAPSULES_COMMAND = 'capsules';
 const GATE_COMMAND = 'gate';
 /** Hook mode: prose a human can read, and silence when there was simply nothing to check. */
 const HOOK_FLAG = '--hook';
+const ACCEPT_COVERAGE_FLAG = '--accept-coverage';
 /** `reticle report [--session <id>] [--hook]` — what the latest session claimed, and what held. */
 const REPORT_COMMAND = 'report';
 const SESSION_FLAG = '--session';
@@ -191,7 +194,7 @@ const KNOWN_COMMANDS: ReadonlySet<string> = new Set([
   FEEDBACK_COMMAND,
   IDENTIFY_COMMAND,
   DAEMON_INNER_COMMAND,
-  // Cloud subcommands dispatch before the local parser but are still commands a human ran.
+  'connect',
   'login',
   'logout',
   'whoami',
@@ -382,7 +385,7 @@ export type CliResult =
   | { kind: 'affected'; files: string[]; since?: string }
   | { kind: 'hunt'; dir: string }
   | { kind: 'capsules' }
-  | { kind: 'gate'; files: string[]; since?: string; hook?: boolean }
+  | { kind: 'gate'; files: string[]; since?: string; hook?: boolean; acceptCoverage?: boolean }
   | { kind: 'report'; session?: string; hook: boolean }
   | { kind: 'watch'; url?: string }
   | { kind: 'update' }
@@ -702,6 +705,17 @@ function parseTargetArgs(rest: string[]): { files: string[]; since?: string } {
 }
 
 /**
+ * Whether this command talks to a daemon on the resolved port, and so must not run when
+ * the workspace port conflict (cli-port) has said the port is a guess. `init` carries a port but resolves the
+ * workspace itself, and a tutorial only dials one when asked to run.
+ */
+export function dialsTheDaemon(parsed: CliResult): boolean {
+  if ('init' === parsed.kind) return false;
+  if ('tutorial' === parsed.kind) return parsed.run;
+  return 'port' in parsed;
+}
+
+/**
  * @param defaultHeadless Whether a browser Reticle launches should be hidden when no flag says
  *   otherwise. Injected rather than read from the environment here, because this module is pure —
  *   `cli.ts` decides it from `CI`. The product default is FALSE: showing the run is what makes it
@@ -934,15 +948,17 @@ export function parseCliArgs(
       return { kind: 'affected', files: t.files, ...(since === undefined ? {} : { since }) };
     }
     case GATE_COMMAND: {
-      // `--hook` is stripped before target parsing, which would reject it as an unknown flag.
+      // Flags are stripped before target parsing, which would reject them as unknown.
       const hook = rest.includes(HOOK_FLAG);
-      const t = parseTargetArgs(rest.filter((a) => a !== HOOK_FLAG));
+      const acceptCoverage = rest.includes(ACCEPT_COVERAGE_FLAG);
+      const t = parseTargetArgs(rest.filter((a) => a !== HOOK_FLAG && a !== ACCEPT_COVERAGE_FLAG));
       const since = t.since ?? implicitSince(t.files);
       return {
         kind: 'gate',
         files: t.files,
         ...(since === undefined ? {} : { since }),
         ...(hook ? { hook: true } : {}),
+        ...(acceptCoverage ? { acceptCoverage: true } : {}),
       };
     }
     case REPORT_COMMAND: {

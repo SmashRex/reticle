@@ -4,7 +4,7 @@ description: 'Zero to your agent verifying your real app, step by step, with wor
 icon: rocket
 ---
 
-**To get started with Reticle: run the installer, open your coding agent, then run `npx @reticlehq/server init` in your project root.** Getting started is three stages. **Installation** is one command in a terminal, `curl -fsSL https://raw.githubusercontent.com/reticlehq/reticle/main/install/install.sh | sh` (or `irm https://raw.githubusercontent.com/reticlehq/reticle/main/install/install.ps1 | iex` on Windows): it puts the CLI on the machine and registers the MCP server with every agent it can reach, so the tools are there the next time you open your agent. **Onboarding** is `init`: it wires your project, starts your dev server, opens the app and waits for it to connect. **The first run** is what proves anything: `reticle_verify { action: "explore", persona: "<the journey worth proving>" }`, or from a terminal `npx @reticlehq/server verify <url> --explore --persona "<the journey worth proving>"`. A connected app is not a verified one. Reticle is a verification layer that embeds a dev-only SDK in your running web app so an AI coding agent can prove a change works instead of guessing. It needs Node 20 or newer, an app you run locally, and an agent that speaks MCP.
+**To get started with Reticle Cloud: run the installer, then `reticle connect --project "My App"` in your app directory before opening your coding agent.** The installer puts the CLI on the machine and registers its MCP tools with supported agents. `connect` wires your app, checks that a browser session connected, opens sign-in approval if needed, links the named cloud project, and syncs existing history. The first run is what proves anything: ask your agent to verify one journey in your app, or use `reticle_verify { action: "explore", persona: "<the journey worth proving>" }`. A connected app is not a verified one. For local-only verification without an account, use `reticle init` instead. You need Node 20.11 or newer, an app you run locally, and an agent that speaks MCP.
 
 > **Looking for the fast path?** [Quickstart](/quickstart) gets you to a real verdict in five minutes, and every response on it was captured live. [Agentic install](/install-agentic) and [Manual install](/install-manual) cover setup in detail, per agent and per framework.
 >
@@ -58,7 +58,17 @@ Everything is **dev-only** and **localhost-only**. It's tree-shaken out of produ
 
 ---
 
-## Fastest path: `reticle init`
+## Cloud setup: `reticle connect`
+
+After the one-time [installer](/quickstart), run this in your app directory:
+
+```bash
+npx @reticlehq/server connect --project "My App"
+```
+
+Approve the short browser code if Reticle asks you to sign in. The command then links this folder and sends any history already on the machine. Open or restart your coding agent and ask it to verify one real journey. For a new project, the dashboard has no result until that first run is recorded.
+
+## Local-only path: `reticle init`
 
 From your project root:
 
@@ -78,7 +88,7 @@ The bridge + MCP server is a single process that serves all your projects, so it
 
 Re-running is safe: already-registered and already-patched steps are skipped, and on a wired project it goes straight to proving the app still works. Preview without writing via `npx @reticlehq/server init --dry-run`.
 
-`init` does not stop at writing files. It starts your dev server (restarting one whose bundle predates the config edit), opens the app, and waits for a session to connect from inside it. That connection is the whole proof that onboarding worked. It exits non-zero if nothing connected and prints what is left to do. It does NOT drive. Then prove a flow. That is the FIRST RUN, and it is a separate call: `reticle_verify { action: "explore", persona: "<who does what>" }`. It drives with a model inside the daemon and records what it drove, so later checks replay it with no model in the loop.
+`init` does not stop at writing files. It starts your dev server, opens the app, and waits for a session to connect from inside it. That connection is the whole proof that onboarding worked. If a dev server was already running without Reticle, restart it once: it read the build config before `init` edited it. It exits non-zero if nothing connected and prints what is left to do. It does NOT drive. Then prove a flow. That is the FIRST RUN, and it is a separate call: `reticle_verify { action: "explore", persona: "<who does what>" }`. It drives with a model inside the daemon and records what it drove, so later checks replay it with no model in the loop.
 
 These carry what the command cannot work out for itself:
 
@@ -90,7 +100,7 @@ These carry what the command cannot work out for itself:
 
 The rest are dials: `--license <key>` (writes it to `.env` and keeps `.env` out of git), `--json` (one object for an agent to read), `--files-only` (write, register, pre-approve, and stop, which is what `init` did before it learned to boot the app, and what an existing install re-runs to pick up new wiring), `--relaunch` (prints the command that restarts the conversation you are in, with the tools loaded: the restart step most installs stall on, and it composes with `--files-only`), `--no-open`, `--dry-run`, `--port N`, `--no-mcp`, `--no-install`.
 
-Then restart your dev server and skip to [Step 4](#step-4-run-it-and-verify-the-connection). The manual steps below explain what `init` sets up, if you prefer to wire it yourself.
+If you ran `--files-only` with a dev server already running, restart it, then skip to [Step 4](#step-4-run-it-and-verify-the-connection). The manual steps below explain what `init` sets up, if you prefer to wire it yourself.
 
 ---
 
@@ -464,7 +474,7 @@ Everything below comes from the `@reticlehq/react` kit plus your framework's bui
 
 **You do not get** component identity. `@reticlehq/react` walks the fiber tree to answer "which component rendered this element"; there is no Svelte equivalent, so snapshots carry the file and line but no component name. Stamping targets Svelte 5's compiler AST and also accepts Svelte 4's; `.svelte.ts` runes modules are code rather than markup and are not stamped.
 
-**It is still unverified.** There is no SvelteKit app in `apps/` and no CI gate for one, so nothing would tell us when this breaks; `reticle init` says so out loud in its plan. React, Next.js, Remix and Astro each have an app and a gate. Treat SvelteKit as wired and plausible, not as supported.
+**It is install-gated, drive-unverified.** The install gate scaffolds a SvelteKit app from scratch, runs `init`, boots it and waits for a session, so the setup is proven. There is no SvelteKit example app that CI drives to a verdict, so the drive is not. [Frameworks](/frameworks) has the full status table.
 
 **Vue is install-gated, drive-unverified.** `init` detects a Vue app (as a Vite app with Vue as the UI library) and the install gate scaffolds one from scratch, runs `init`, boots it and waits for a session, so the setup is proven. What is not proven is the drive: there is no Vue example app in CI. `piniaStore` reads a Pinia store, and everything the framework-neutral core provides works. What you do not get is a `source` field, because source stamping covers JSX and Svelte components and a `.vue` single-file component is neither. See [Frameworks](/frameworks) for the full status table.
 

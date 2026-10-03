@@ -13,13 +13,9 @@ npx @reticlehq/server <command>
 ```
 
 <Warning>
-  **Always invoke it as `npx @reticlehq/server <command>`.** The tables below name the commands as
-  `reticle <command>`, because `reticle` is the bin this package installs and that is what the CLI
-  prints about itself. It is **not** a package on npm: the bare name `reticle` belongs to an
-  unrelated author, so putting `npx` in front of it downloads and runs their code instead of ours.
-  Once
-  `@reticlehq/server` is a dependency of your project, `reticle <command>` works from an npm script
-  or with the bin on your PATH.
+  If you used the installer, run `reticle <command>`: it put that bin on your PATH. Otherwise use
+  `npx @reticlehq/server <command>`. Do not put `npx` before the bare `reticle` bin name: the npm
+  package with that name belongs to an unrelated author.
 </Warning>
 
 <Note>
@@ -29,6 +25,16 @@ npx @reticlehq/server <command>
 </Note>
 
 ## Setup and diagnosis
+
+### `reticle connect`
+
+From an app directory, one command wires an unwired app, proves a browser session, signs in through browser approval if needed, links the chosen cloud project, and syncs existing local history. A saved sign-in is reused only after the intended cloud host accepts it. Run `reticle init` instead for local-only verification.
+
+```bash
+npx @reticlehq/server connect --project "My App"
+```
+
+For a self-hosted cloud, add `--url <cloud origin>`. If the app was already wired, `connect` keeps its local setup and refreshes the cloud link. A fresh app has no run to send until you verify a flow with your agent.
 
 ### `reticle init`
 
@@ -111,6 +117,15 @@ policy       https://github.com/reticlehq/reticle/blob/main/docs/telemetry.md
 | `reticle mcp` | The MCP stdio proxy. Auto-starts the daemon if needed. This is what your agent runs |
 
 A bare `reticle` with no arguments is not help. It is `reticle serve`.
+
+<Note>
+  When the Reticle SDK installed in the project is a different **major** version from the CLI you ran,
+  the CLI hands the same command to `npx @reticlehq/server@<that version>`, so an unpinned
+  `npx @reticlehq/server` never pairs a daemon with an SDK it cannot talk to. `init`, `update`,
+  `rollback`, `setup install`, `version` and `help` always run as typed, and so does a command whose
+  version you pinned yourself (`npx @reticlehq/server@<version> …`). Set `RETICLE_NO_VERSION_MATCH=1` to
+  turn it off.
+</Note>
 
 <Warning>
   `reticle verify` binds the bridge port itself, so it fails if a daemon is already listening, which
