@@ -153,9 +153,9 @@ describe('planKill', () => {
 
   it('does not report success when the killed process exits but the port is still occupied', async () => {
     vi.mocked(probePresenceWithStatus).mockResolvedValueOnce({
-    presence: PortPresence.DAEMON,
-    status: { running: true, pid: DAEMON_PID },
-});
+      presence: PortPresence.DAEMON,
+      status: { running: true, pid: DAEMON_PID },
+    });
 
     vi.mocked(probePresence).mockResolvedValueOnce(PortPresence.FOREIGN);
 
