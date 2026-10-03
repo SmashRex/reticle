@@ -588,6 +588,8 @@ export async function startDaemon(options: StartOptions = {}): Promise<RunningSe
       bridge.sessions.noSessionHint(),
       verifyHttp?.port,
       bridge.sessions.noSessionLead(),
+      // Expose the daemon's own PID so kill can identify it even when lsof is unavailable.
+      process.pid,
     );
   });
   // Agent-independent presence: the daemon outlives any single agent, so when the LAST agent's MCP
@@ -991,3 +993,4 @@ export type {
 export { onHook as onReticleEvent, emitHook, hookListenerCount } from './hooks/hook-bus.js';
 export type { HookListener } from './hooks/hook-bus.js';
 export { readHookConfig } from './hooks/hook-commands.js';
+

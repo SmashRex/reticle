@@ -48,8 +48,7 @@ describe('parsePortHolder', () => {
 
 describe('parseNetstatPortHolder', () => {
   it('reads the pid of a TCP listener for the requested port', () => {
-    const stdout =
-      '  TCP    127.0.0.1:4400    0.0.0.0:0    LISTENING    90502\n';
+    const stdout = '  TCP    127.0.0.1:4400    0.0.0.0:0    LISTENING    90502\n';
 
     expect(parseNetstatPortHolder(stdout, 4400)).toEqual({
       pid: 90502,
@@ -58,8 +57,7 @@ describe('parseNetstatPortHolder', () => {
   });
 
   it('matches IPv6 listeners', () => {
-    const stdout =
-      '  TCP    [::1]:4400       [::]:0       LISTENING    90777\n';
+    const stdout = '  TCP    [::1]:4400       [::]:0       LISTENING    90777\n';
 
     expect(parseNetstatPortHolder(stdout, 4400)).toEqual({
       pid: 90777,
@@ -68,22 +66,19 @@ describe('parseNetstatPortHolder', () => {
   });
 
   it('ignores listeners on other ports', () => {
-    const stdout =
-      '  TCP    127.0.0.1:4500    0.0.0.0:0    LISTENING    90502\n';
+    const stdout = '  TCP    127.0.0.1:4500    0.0.0.0:0    LISTENING    90502\n';
 
     expect(parseNetstatPortHolder(stdout, 4400)).toBeNull();
   });
 
   it('ignores non-listening connections', () => {
-    const stdout =
-      '  TCP    127.0.0.1:4400    127.0.0.1:5500    ESTABLISHED    90502\n';
+    const stdout = '  TCP    127.0.0.1:4400    127.0.0.1:5500    ESTABLISHED    90502\n';
 
     expect(parseNetstatPortHolder(stdout, 4400)).toBeNull();
   });
 
   it('returns null when the listener pid is invalid', () => {
-    const stdout =
-      '  TCP    127.0.0.1:4400    0.0.0.0:0    LISTENING    not-a-pid\n';
+    const stdout = '  TCP    127.0.0.1:4400    0.0.0.0:0    LISTENING    not-a-pid\n';
 
     expect(parseNetstatPortHolder(stdout, 4400)).toBeNull();
   });
