@@ -28,11 +28,11 @@ vi.mock('@/command/daemon/binding/port-presence.js', () => ({
     FREE: 'free',
   },
   probePresence: vi.fn(),
+  probePresenceWithStatus: vi.fn(),
 }));
 
 vi.mock('@/command/daemon/binding/daemon-status-probe.js', () => ({
   fetchStatus: vi.fn(),
-  statusPid: vi.fn(),
 }));
 
 vi.mock('@/surface/mcp/mcp-proxy.js', () => ({
@@ -48,8 +48,12 @@ vi.mock('@/log.js', () => ({
   log: vi.fn(),
 }));
 
-import { probePresence, PortPresence } from '@/command/daemon/binding/port-presence.js';
-import { fetchStatus, statusPid } from '@/command/daemon/binding/daemon-status-probe.js';
+import {
+  probePresence,
+  probePresenceWithStatus,
+  PortPresence,
+} from '@/command/daemon/binding/port-presence.js';
+import { fetchStatus } from '@/command/daemon/binding/daemon-status-probe.js';
 import { findPortHolder } from './ports/port-holder.js';
 
 const DAEMON_PID = 70244;
@@ -61,7 +65,6 @@ describe('planKill', () => {
       planKill({
         listener: null,
         recordedPid: null,
-        statusPid: null,
         answersStatus: false,
         force: false,
       }).action,
@@ -72,7 +75,6 @@ describe('planKill', () => {
     const plan = planKill({
       listener: { pid: DAEMON_PID, command: 'node' },
       recordedPid: DAEMON_PID,
-      statusPid: null,
       answersStatus: false,
       force: false,
     });
@@ -89,7 +91,6 @@ describe('planKill', () => {
     const plan = planKill({
       listener: { pid: STRANGER_PID, command: 'node' },
       recordedPid: DAEMON_PID,
-      statusPid: null,
       answersStatus: true,
       force: false,
     });
@@ -101,7 +102,6 @@ describe('planKill', () => {
     const plan = planKill({
       listener: { pid: STRANGER_PID, command: 'Docker' },
       recordedPid: null,
-      statusPid: null,
       answersStatus: false,
       force: false,
     });
@@ -115,7 +115,6 @@ describe('planKill', () => {
     const plan = planKill({
       listener: { pid: STRANGER_PID, command: 'Docker' },
       recordedPid: null,
-      statusPid: null,
       answersStatus: false,
       force: true,
     });
@@ -132,7 +131,6 @@ describe('planKill', () => {
     const plan = planKill({
       listener: null,
       recordedPid: DAEMON_PID,
-      statusPid: null,
       answersStatus: true,
       force: false,
     });
@@ -141,25 +139,10 @@ describe('planKill', () => {
     expect(plan.identifiedListener).toBe(false);
   });
 
-  it('kills the daemon pid reported by /status when no listener or pid file is available', () => {
+  it('refuses when /status identifies a daemon but no listener or recorded pid is available', () => {
     const plan = planKill({
       listener: null,
       recordedPid: null,
-      statusPid: DAEMON_PID,
-      answersStatus: true,
-      force: false,
-    });
-
-    expect(plan.action).toBe(KillAction.KILL);
-    expect(plan.pid).toBe(DAEMON_PID);
-    expect(plan.forced).toBe(false);
-  });
-
-  it('refuses when /status identifies a daemon but provides no pid', () => {
-    const plan = planKill({
-      listener: null,
-      recordedPid: null,
-      statusPid: null,
       answersStatus: true,
       force: false,
     });
@@ -169,13 +152,19 @@ describe('planKill', () => {
   });
 
   it('does not report success when the killed process exits but the port is still occupied', async () => {
-    vi.mocked(probePresence)
-      .mockResolvedValueOnce(PortPresence.DAEMON)
-      .mockResolvedValueOnce(PortPresence.FOREIGN);
+    vi.mocked(probePresenceWithStatus).mockResolvedValueOnce({
+    presence: PortPresence.DAEMON,
+    status: { running: true, pid: DAEMON_PID },
+});
 
-    vi.mocked(findPortHolder).mockReturnValue(null);
+    vi.mocked(probePresence).mockResolvedValueOnce(PortPresence.FOREIGN);
+
+    vi.mocked(findPortHolder).mockReturnValue({
+      pid: DAEMON_PID,
+      command: 'node',
+    });
+
     vi.mocked(fetchStatus).mockResolvedValue({ running: true, pid: DAEMON_PID });
-    vi.mocked(statusPid).mockReturnValue(DAEMON_PID);
 
     const terminateProcess = vi.fn().mockResolvedValue({
       gone: true,
@@ -185,7 +174,9 @@ describe('planKill', () => {
     const result = await runKill(4400, false, terminateProcess);
 
     expect(terminateProcess).toHaveBeenCalledWith(DAEMON_PID);
-    expect(probePresence).toHaveBeenCalledTimes(2);
+    expect(probePresenceWithStatus).toHaveBeenCalledTimes(1);
+    expect(fetchStatus).toHaveBeenCalledTimes(0);
+    expect(probePresence).toHaveBeenCalledTimes(1);
     expect(result).toBe(false);
   });
 });

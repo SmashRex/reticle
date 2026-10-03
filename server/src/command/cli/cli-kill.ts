@@ -18,11 +18,15 @@
  * user actually wants freed, and falls back to the pid file only where the lookup cannot run.
  */
 
-import { PortPresence, probePresence } from '@/command/daemon/binding/port-presence.js';
+import {
+  PortPresence,
+  probePresence,
+  probePresenceWithStatus,
+} from '@/command/daemon/binding/port-presence.js';
 import { isAlive, readPid, removePid } from '@/command/daemon/daemon.js';
 import { probeDaemon } from '@/surface/mcp/mcp-proxy.js';
 import { log } from '@/log.js';
-import { fetchStatus, statusPid } from '@/command/daemon/binding/daemon-status-probe.js';
+import { fetchStatus } from '@/command/daemon/binding/daemon-status-probe.js';
 import { captureLookup, findPortHolder, type PortHolder } from './ports/port-holder.js';
 
 /** What the plan says to do with the port. */
@@ -60,29 +64,19 @@ export function planKill(input: {
   listener: PortHolder | null;
   /** The pid our records hold for this port, or null when there is none or it is dead. */
   recordedPid: number | null;
-  /** The pid of the process that answered `/status`, or null when there is none or it is dead. */
-  statusPid: number | null;
   /** Whether the port answers `/status`, i.e. whatever holds it is a Reticle daemon. */
   answersStatus: boolean;
   /** Whether the user has requested to force the kill. */
   force: boolean;
 }): KillPlan {
-  const { listener, recordedPid, statusPid, answersStatus, force } = input;
+  const { listener, recordedPid, answersStatus, force } = input;
   if (null === listener) {
-    // When lsof is unavailable, /status can still identify the Reticle daemon by its own pid.
+    // When the listener lookup is unavailable, /status can confirm that the port belongs to Reticle,
+    // but without a trusted process id there is no safe process to terminate.
     if (null !== recordedPid) {
       return {
         action: KillAction.KILL,
         pid: recordedPid,
-        forced: false,
-        identifiedListener: false,
-      };
-    }
-
-    if (null !== statusPid) {
-      return {
-        action: KillAction.KILL,
-        pid: statusPid,
         forced: false,
         identifiedListener: false,
       };
@@ -94,9 +88,7 @@ export function planKill(input: {
         action: KillAction.REFUSE,
         forced: false,
         identifiedListener: false,
-        reason:
-          'The port answers /status as a Reticle daemon, but Reticle could not determine its pid. ' +
-          'Refusing to report success because the daemon is still running.',
+        reason:PID_UNKNOWN_REFUSAL_REASON,
       };
     }
 
@@ -181,6 +173,16 @@ async function terminate(
 const PROXY_SPARED_NOTE =
   'only the listener was signalled. Any `reticle mcp` proxy on this port holds a client connection, ' +
   'not the port, and was left alone — it goes dormant and starts a fresh daemon on the next tool call.';
+const PID_UNKNOWN_REFUSAL_REASON =
+  'The port answers /status as a Reticle daemon, but Reticle could not determine its pid. ' +
+  'Refusing to report success because the daemon is still running.';
+
+const PID_SURVIVED_KILL_NOTE = (pid: number): string =>
+  `pid ${String(pid)} survived SIGKILL, so it is not yours to kill (permissions) or is an ` +
+  `unkillable zombie. The port is still held. ${PROXY_SPARED_NOTE}`;
+
+const PID_EXITED_PORT_HELD_NOTE = (pid: number): string =>
+  `pid ${String(pid)} exited, but the port is still held. ${PROXY_SPARED_NOTE}`;
 
 /** `reticle kill` — free the port. Resolves to whether the port is now free. */
 export async function runKill(
@@ -188,13 +190,15 @@ export async function runKill(
   force: boolean,
   terminateProcess: typeof terminate = terminate,
 ): Promise<boolean> {
-  const presence = await probePresence(port, { tcpOpen: probeDaemon, status: fetchStatus });
+  const probe = await probePresenceWithStatus(port, {
+    tcpOpen: probeDaemon,
+    status: fetchStatus,
+  });
+  const { presence } = probe;
   const recorded = readPid(port);
-  const status = presence === PortPresence.DAEMON ? await fetchStatus(port) : undefined;
   const plan = planKill({
     listener: findPortHolder(port, captureLookup),
     recordedPid: null !== recorded && isAlive(recorded) ? recorded : null,
-    statusPid: statusPid(status),
     answersStatus: presence === PortPresence.DAEMON,
     force,
   });
@@ -223,12 +227,11 @@ export async function runKill(
       pid,
       escalated,
       ...(plan.forced ? { forced: true } : {}),
-      // Say where the pid came from. Without `lsof` this is the pid we recorded, not the pid we
+      // Say whether the process was identified by the OS as the listener or came from
+      // Reticle's recorded pid.
       // observed listening, and those are different claims.
       listenerIdentified: plan.identifiedListener,
-      note:
-        `pid ${String(pid)} survived SIGKILL, so it is not yours to kill (permissions) or is an ` +
-        `unkillable zombie. The port is still held. ${PROXY_SPARED_NOTE}`,
+      note: PID_SURVIVED_KILL_NOTE(pid),
     });
     return false;
   }
@@ -247,7 +250,7 @@ export async function runKill(
       escalated,
       ...(plan.forced ? { forced: true } : {}),
       listenerIdentified: plan.identifiedListener,
-      note: `pid ${String(pid)} exited, but the port is still held. ${PROXY_SPARED_NOTE}`,
+      note: PID_EXITED_PORT_HELD_NOTE(pid),
     });
     return false;
   }
