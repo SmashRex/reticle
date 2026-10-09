@@ -18,11 +18,7 @@
  * user actually wants freed, and falls back to the pid file only where the lookup cannot run.
  */
 
-import {
-  PortPresence,
-  probePresence,
-  probePresenceWithStatus,
-} from '@/command/daemon/binding/port-presence.js';
+import { PortPresence, probePresence } from '@/command/daemon/binding/port-presence.js';
 import { isAlive, readPid, removePid } from '@/command/daemon/daemon.js';
 import { probeDaemon } from '@/surface/mcp/mcp-proxy.js';
 import { log } from '@/log.js';
@@ -134,14 +130,10 @@ const KILL_POLL_MS = 100;
  * daemon that ignored SIGTERM until a human ran `kill -9` by hand, which is the moment the `lsof -ti`
  * pipeline gets typed and the agent's proxy dies with the daemon.
  */
-async function terminate(
-  pid: number,
-  kill: (pid: number, signal: NodeJS.Signals) => void = (targetPid, signal) =>
-    process.kill(targetPid, signal),
-): Promise<{ gone: boolean; escalated: boolean }> {
+async function terminate(pid: number): Promise<{ gone: boolean; escalated: boolean }> {
   const signal = (name: NodeJS.Signals): void => {
     try {
-      kill(pid, name);
+      process.kill(pid, name);
     } catch {
       // Gone between the liveness check and here. The next poll reports it as gone.
     }
@@ -190,11 +182,10 @@ export async function runKill(
   force: boolean,
   terminateProcess: typeof terminate = terminate,
 ): Promise<boolean> {
-  const probe = await probePresenceWithStatus(port, {
+  const presence = await probePresence(port, {
     tcpOpen: probeDaemon,
     status: fetchStatus,
   });
-  const { presence } = probe;
   const recorded = readPid(port);
   const plan = planKill({
     listener: findPortHolder(port, captureLookup),

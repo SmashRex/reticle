@@ -86,26 +86,6 @@ export async function probePresence(
   return classifyPort({ tcpOpen, statusAnswered: status !== undefined });
 }
 
-export async function probePresenceWithStatus(
-  port: number,
-  probes: {
-    tcpOpen: (port: number) => Promise<boolean>;
-    status: (port: number) => Promise<unknown>;
-  },
-): Promise<{ presence: PortPresence; status: unknown }> {
-  const tcpOpen = await probes.tcpOpen(port);
-  if (!tcpOpen) {
-    return { presence: PortPresence.FREE, status: undefined };
-  }
-
-  const status = await probes.status(port);
-
-  return {
-    presence: classifyPort({ tcpOpen, statusAnswered: status !== undefined }),
-    status,
-  };
-}
-
 /**
  * Who is holding the port, when we can tell.
  *

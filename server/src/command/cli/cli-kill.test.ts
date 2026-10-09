@@ -28,7 +28,6 @@ vi.mock('@/command/daemon/binding/port-presence.js', () => ({
     FREE: 'free',
   },
   probePresence: vi.fn(),
-  probePresenceWithStatus: vi.fn(),
 }));
 
 vi.mock('@/command/daemon/binding/daemon-status-probe.js', () => ({
@@ -48,11 +47,7 @@ vi.mock('@/log.js', () => ({
   log: vi.fn(),
 }));
 
-import {
-  probePresence,
-  probePresenceWithStatus,
-  PortPresence,
-} from '@/command/daemon/binding/port-presence.js';
+import { probePresence, PortPresence } from '@/command/daemon/binding/port-presence.js';
 import { fetchStatus } from '@/command/daemon/binding/daemon-status-probe.js';
 import { findPortHolder } from './ports/port-holder.js';
 
@@ -69,6 +64,18 @@ describe('planKill', () => {
         force: false,
       }).action,
     ).toBe(KillAction.NOTHING);
+  });
+
+  it.each([false, true])('never plans to kill without a pid (force: %s)', (force) => {
+    const plan = planKill({
+      listener: null,
+      recordedPid: null,
+      answersStatus: true,
+      force,
+    });
+
+    expect(plan.action).not.toBe(KillAction.KILL);
+    expect(plan.pid).toBeUndefined();
   });
 
   it('kills the listener when it is the pid we recorded for the port', () => {
@@ -152,10 +159,7 @@ describe('planKill', () => {
   });
 
   it('does not report success when the killed process exits but the port is still occupied', async () => {
-    vi.mocked(probePresenceWithStatus).mockResolvedValueOnce({
-      presence: PortPresence.DAEMON,
-      status: { running: true, pid: DAEMON_PID },
-    });
+    vi.mocked(probePresence).mockResolvedValueOnce(PortPresence.DAEMON);
 
     vi.mocked(probePresence).mockResolvedValueOnce(PortPresence.FOREIGN);
 
@@ -174,9 +178,8 @@ describe('planKill', () => {
     const result = await runKill(4400, false, terminateProcess);
 
     expect(terminateProcess).toHaveBeenCalledWith(DAEMON_PID);
-    expect(probePresenceWithStatus).toHaveBeenCalledTimes(1);
     expect(fetchStatus).toHaveBeenCalledTimes(0);
-    expect(probePresence).toHaveBeenCalledTimes(1);
+    expect(probePresence).toHaveBeenCalledTimes(2);
     expect(result).toBe(false);
   });
 });
