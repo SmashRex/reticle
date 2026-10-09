@@ -15,6 +15,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { parseNetstatListeners } from '../../setup/terminal/listeners.js';
 
 export interface PortHolder {
   pid: number;
@@ -129,36 +130,10 @@ export function describeForeignHolder(
   );
 }
 
-/** Parse the first TCP listener for a port from `netstat -ano` output. */
+/** Find the first TCP listener for a port in `netstat -ano` output. */
 export function parseNetstatPortHolder(stdout: string, port: number): PortHolder | null {
-  for (const raw of stdout.split('\n')) {
-    const fields = raw.trim().split(/\s+/);
-    const protocol = fields[0];
-    const localAddress = fields[1];
-    const state = fields[3];
-    const pidValue = fields[4];
-
-    if (
-      undefined === protocol ||
-      undefined === localAddress ||
-      undefined === state ||
-      undefined === pidValue
-    ) {
-      continue;
-    }
-
-    if ('TCP' !== protocol.toUpperCase() || 'LISTENING' !== state.toUpperCase()) continue;
-
-    const portSuffix = `:${String(port)}`;
-    if (!localAddress.endsWith(portSuffix)) continue;
-
-    const pid = Number(pidValue);
-    if (!Number.isInteger(pid) || pid <= 0) return null;
-
-    return { pid, command: 'unknown' };
-  }
-
-  return null;
+  const listener = parseNetstatListeners(stdout).find((entry) => entry.port === port);
+  return listener === undefined ? null : { pid: listener.pid, command: 'unknown' };
 }
 
 /** The lookup itself. `exec` is injected so the shelling out never runs in a unit test. */
