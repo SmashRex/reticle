@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseNetstatPortHolder, parsePortHolder, describeForeignHolder } from './port-holder.js';
+import {
+  describeForeignHolder,
+  parseNetstatPortHolder,
+  parsePortHolder,
+} from './port-holder.js';
 
 /**
  * Naming the process that holds the port.
