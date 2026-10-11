@@ -766,8 +766,12 @@ for (const sc of list) {
           );
           continue;
         }
-        row.verdict = 'NOT MEASURED';
-        row.notes = `error: ${String(e).slice(0, 200)}`;
+        if ('' === row.verdict) {
+          row.verdict = 'NOT MEASURED';
+          row.notes = `error: ${String(e).slice(0, 200)}`;
+        } else {
+          row.notes = `${row.notes}; retry-error=${String(e).slice(0, 120)}`;
+        }
       }
     }
     rows.push(row);
