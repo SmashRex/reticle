@@ -219,9 +219,7 @@ export async function runKill(
       pid,
       escalated,
       ...(plan.forced ? { forced: true } : {}),
-      // Say whether the process was identified by the OS as the listener or came from
-      // Reticle's recorded pid.
-      // observed listening, and those are different claims.
+            // A recorded PID is not necessarily the process observed listening on the port.
       listenerIdentified: plan.identifiedListener,
       note: PID_SURVIVED_KILL_NOTE(pid),
     });
