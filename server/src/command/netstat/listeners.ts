@@ -28,7 +28,7 @@ export function parseNetstatListeners(out: string): NetstatListener[] {
     const port = Number(localAddress.slice(localAddress.lastIndexOf(':') + 1));
     const pid = Number(fields[4]);
 
-   if (Number.isInteger(port) && port > 0 && Number.isInteger(pid) && pid > 0) {
+    if (Number.isInteger(port) && port > 0 && Number.isInteger(pid) && pid > 0) {
       rows.push({ port, pid });
     }
   }
