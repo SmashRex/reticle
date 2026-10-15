@@ -219,7 +219,7 @@ export async function runKill(
       pid,
       escalated,
       ...(plan.forced ? { forced: true } : {}),
-            // A recorded PID is not necessarily the process observed listening on the port.
+      // A recorded PID is not necessarily the process observed listening on the port.
       listenerIdentified: plan.identifiedListener,
       note: PID_SURVIVED_KILL_NOTE(pid),
     });
